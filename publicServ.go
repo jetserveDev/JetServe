@@ -55,7 +55,14 @@ func choosingDirectory2(dirName string) {
 
 	starting := true
 	var port string
+	test := saveToFile()
+	if test == true {
+		color.Green("Logs will be save to JetServe folder")
+	} else {
+		color.Green("Logs won't be saved to file")
+	}
 	reader := bufio.NewReader(os.Stdin)
+
 	color.Yellow("Configure port(port: ....)")
 	for starting {
 		fmt.Print("STARTING>>")
@@ -108,6 +115,18 @@ func startSpaServer2(dirName, port string) {
 	color.Green("DETECTED SPA SIGNATURE")
 
 	fs := http.FileServer(http.Dir(absPath))
+	if os.Chdir("/JetServe") != nil {
+		color.Red("Ошибка")
+		return
+	}
+
+	// Открываем файл для логирования
+	file, errs := os.OpenFile("logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if errs != nil {
+		color.Red("Ошибка файла")
+		return
+	}
+	defer file.Close()
 
 	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -118,6 +137,10 @@ func startSpaServer2(dirName, port string) {
 			ip = ip[:idx]
 		}
 		color.Cyan("[%s] [%s] %s %s", now, ip, r.Method, r.URL.Path)
+		logLine := fmt.Sprintf("[%s] [%s] %s %s\n", now, ip, r.Method, path)
+		if _, err := file.WriteString(logLine); err != nil {
+			color.Red("Ошибка записи")
+		}
 		if isStaticFile(path) {
 			fs.ServeHTTP(w, r)
 			return
@@ -149,14 +172,31 @@ Mode: PUBLIC
 }
 func startServer2(dirName, port string) {
 	absPath, _ := filepath.Abs(dirName)
+	if os.Chdir("/JetServe") != nil {
+		color.Red("Ошибка")
+		return
+	}
+
+	// Открываем файл для логирования
+	file, errs := os.OpenFile("logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if errs != nil {
+		color.Red("Ошибка файла")
+		return
+	}
+	defer file.Close()
 
 	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
 		ip := r.RemoteAddr
 		now := time.Now().Format("15:04:05")
 		if idx := strings.LastIndex(ip, ":"); idx != -1 {
 			ip = ip[:idx]
 		}
 		color.Cyan("[%s] [%s] %s %s", now, ip, r.Method, r.URL.Path)
+		logLine := fmt.Sprintf("[%s] [%s] %s %s\n", now, ip, r.Method, path)
+		if _, err := file.WriteString(logLine); err != nil {
+			color.Red("Ошибка записи")
+		}
 
 		http.FileServer(http.Dir(absPath)).ServeHTTP(w, r)
 
